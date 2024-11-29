@@ -1,0 +1,95 @@
+Sub AddTextboxWithTime()
+    ' 既存の図形（テキストボックス）を削除
+    Call DeleteAllShapes
+    
+    Dim sheet As Worksheet
+    Set sheet = ActiveSheet
+    Dim leftPos As Double, topPos As Double, cellWidth As Double
+    Dim boxnum As Integer, timeIncrement As Integer, startRow As Integer, endRow As Integer
+    Dim currentTime As String, newTime As String
+    
+    ' 最初の時間を入力させる（00:00形式）
+    currentTime = InputBox("最初の時間を00:00の形式で入力してください。")
+    
+    ' 時刻形式の検証
+    If Not IsTimeFormatValid(currentTime) Then
+        MsgBox "無効な時間形式です。00:00の形式で入力してください。", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 左位置と幅を取得
+    leftPos = sheet.Cells(1, 1).Left
+    cellWidth = sheet.Cells(1, 1).Width
+    
+    ' 列Bのデータの最終行を取得
+    boxnum = sheet.Cells(sheet.Rows.Count, 2).End(xlUp).Row
+    
+    ' 最初の「(」を含む行を探す
+    For i = 1 To boxnum
+        If InStr(sheet.Cells(i, 2).Value, "(") > 0 Then
+            startRow = i
+            Exit For
+        End If
+    Next i
+    
+    ' データがない場合のエラーメッセージ
+    If startRow = 0 Then
+        MsgBox "列Bに有効なデータが見つかりません。", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 最初のテキストボックスを追加
+    topPos = sheet.Cells(startRow, 2).Top - 10
+    Call AddTextbox(sheet, leftPos, topPos, cellWidth, currentTime)
+    
+    ' 時刻を計算してテキストボックスを追加
+    For i = startRow To boxnum
+        If InStr(sheet.Cells(i + 1, 2).Value, "(") > 0 Or i = boxnum Then
+            On Error Resume Next ' 不正なデータの処理をスキップ
+            Dim startPos As Integer, endPos As Integer
+            startPos = InStr(sheet.Cells(i, 2).Value, "(") + 1
+            endPos = InStr(sheet.Cells(i, 2).Value, ")") - 1
+            timeIncrement = CInt(Mid(sheet.Cells(i, 2).Value, startPos, endPos - startPos + 1))
+            
+            ' 時刻を更新
+            newTime = Format(DateAdd("n", timeIncrement, currentTime), "hh:mm")
+            currentTime = newTime
+            
+            ' テキストボックスの位置を計算して追加
+            topPos = sheet.Cells(i, 2).Top + sheet.Cells(i, 2).Height - 10
+            Call AddTextbox(sheet, leftPos, topPos, cellWidth, currentTime)
+            On Error GoTo 0
+        End If
+    Next i
+End Sub
+
+' テキストボックスを追加するサブプロシージャ
+Sub AddTextbox(sheet As Worksheet, leftPos As Double, topPos As Double, width As Double, text As String)
+    Dim textbox As Object
+    Set textbox = sheet.Shapes.AddTextbox(msoTextOrientationHorizontal, leftPos, topPos, width, 20)
+    With textbox
+        .TextFrame.Characters.Text = text
+        .TextFrame.Characters.Font.Name = "游明朝"
+        .TextFrame.Characters.Font.Size = 10
+        .Fill.Visible = msoFalse
+        .Line.Visible = msoFalse
+        .TextFrame.HorizontalAlignment = xlHAlignCenter
+        .TextFrame.VerticalAlignment = xlVAlignCenter
+    End With
+End Sub
+
+' 既存の図形を削除するサブプロシージャ
+Sub DeleteAllShapes()
+    On Error Resume Next
+    ActiveSheet.DrawingObjects.Delete
+    On Error GoTo 0
+End Sub
+
+' 時刻形式の検証
+Function IsTimeFormatValid(inputTime As String) As Boolean
+    On Error Resume Next
+    Dim tempTime As Date
+    tempTime = TimeValue(inputTime)
+    IsTimeFormatValid = (Err.Number = 0)
+    On Error GoTo 0
+End Function
